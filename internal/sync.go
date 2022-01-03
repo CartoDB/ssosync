@@ -273,12 +273,17 @@ func (s *syncGSuite) SyncGroupsUsers(queries []string) error {
 	if err != nil {
 		return err
 	}
+
+	// Filter groups
 	filteredGoogleGroups := []*admin.Group{}
 	for _, g := range googleGroups {
+
+		// bacaudse is in flag --ignore-groups
 		if s.ignoreGroup(g.Email) {
-			log.WithField("group", g.Email).Debug("ignoring group")
+			log.WithField("group", g.Email).Warn("ignoring group, using --ignore-groups")
 			continue
 		}
+
 		filteredGoogleGroups = append(filteredGoogleGroups, g)
 	}
 	googleGroups = filteredGoogleGroups
@@ -373,7 +378,7 @@ func (s *syncGSuite) SyncGroupsUsers(queries []string) error {
 		log := log.WithFields(log.Fields{"group": awsGroup.DisplayName})
 
 		log.Info("creating group")
-		_, err := s.aws.CreateGroup(awsGroup)
+		awsGroupFull, err := s.aws.CreateGroup(awsGroup)
 		if err != nil {
 			log.Error("creating group")
 			return err
@@ -390,7 +395,7 @@ func (s *syncGSuite) SyncGroupsUsers(queries []string) error {
 			}
 
 			log.WithField("user", awsUserFull.Username).Info("adding user to group")
-			err = s.aws.AddUserToGroup(awsUserFull, awsGroup)
+			err = s.aws.AddUserToGroup(awsUserFull, awsGroupFull)
 			if err != nil {
 				return err
 			}
@@ -504,12 +509,16 @@ func (s *syncGSuite) getGoogleGroupsAndUsers(googleGroups []*admin.Group) ([]*ad
 				return nil, nil, err
 			}
 
-			membersUsers = append(membersUsers, u[0])
-
-			_, ok := gUniqUsers[m.Email]
-			if !ok {
-				gUniqUsers[m.Email] = u[0]
+			if len(u) != 0 {
+				membersUsers = append(membersUsers, u[0])
+				_, ok := gUniqUsers[m.Email]
+				if !ok {
+					gUniqUsers[m.Email] = u[0]
+				}
+			} else {
+				log.WithField("member", m.Email).Warn("ignoring group member because it is not a user, looks like a group inside the group")
 			}
+
 		}
 		gGroupsUsers[g.Name] = membersUsers
 	}
