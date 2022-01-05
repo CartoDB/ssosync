@@ -363,11 +363,17 @@ func (s *syncGSuite) SyncGroupsUsers(queries []string) error {
 
 		log := log.WithFields(log.Fields{"user": awsUser.Username})
 
-		log.Info("creating user")
-		_, err := s.aws.CreateUser(awsUser)
-		if err != nil {
-			log.Error("error creating user")
-			return err
+		// Check if the user it's already created in aws
+		uu, _ := s.aws.FindUserByEmail(awsUser.Username)
+		if uu == nil {
+			log.Info("creating user")
+			_, err := s.aws.CreateUser(awsUser)
+			if err != nil {
+				log.Error("error creating user")
+				return err
+			}
+		} else {
+			log.Debug("user it's already created")
 		}
 	}
 
